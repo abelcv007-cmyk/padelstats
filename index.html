@@ -429,91 +429,135 @@
     <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-database-compat.js"></script>
 
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script>
-        // Configuración de Firebase (IMPORTANTE: obtén tus credenciales)
-        const firebaseConfig = {
-            apiKey: "AIzaSyA3VrTmPJsJwh6KZ6TW_1ScZ8eya-K8eZU",
-            authDomain: "padel-los-cachorros.firebaseapp.com",
-            projectId: "padel-los-cachorros",
-            storageBucket: "padel-los-cachorros.appspot.com",
-            messagingSenderId: "914321201812",
-            appId: "1:914321201812:web:a213e0667ad51a19c17281"
-        };
+        const { createClient } = supabase;
+        const SUPABASE_URL = "https://yuafulwhvpfkhzwtbdbk.supabase.co";
+        const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl1YWZ1bHdodnBma2h6d3RiZGJrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc0NTQzOTMsImV4cCI6MjA4MzAzMDM5M30.w-aFYBiE7sFnAb4MHF06lovvhX-5badTiC7efZzJ1pg";
+        const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-        // Inicializar Firebase
-        firebase.initializeApp(firebaseConfig);
-        const db = firebase.database();
+        const GROUP_CODE = "berromoro";
+        let currentGroup = null;
+    </script>
 
+
+    <script>
         // Datos locales
         let players = [];
         let matches = [];
         let isAuthenticated = false;
-        const GROUP_PASSWORD = "berromoro"; // Cambiar por contraseña del grupo
 
-        // Cargar datos desde Firebase al iniciar
-        function loadData() {
-            if (!isAuthenticated) {
-                showLoginPrompt();
-                return;
-            }
+        // --- AUTENTICACIÓN SIMPLE POR PASSWORD (igual que antes) ---
+        const GROUP_PASSWORD = "berromoro";
 
-            db.ref('players').on('value', (snapshot) => {
-                const data = snapshot.val();
-                players = data ? Object.values(data) : [];
-                updateUI();
-            }, (error) => {
-                console.error("Error loading players:", error);
-                showError("Error cargando jugadores: " + error.message);
-            });
-
-            db.ref('matches').on('value', (snapshot) => {
-                const data = snapshot.val();
-                matches = data ? Object.values(data) : [];
-                updateUI();
-            }, (error) => {
-                console.error("Error loading matches:", error);
-            });
-        }
-
-        // Guardar datos en Firebase
-        function saveData() {
-            if (!isAuthenticated) return;
-
-            db.ref('players').set(players)
-                .then(() => console.log("Players saved"))
-                .catch(err => {
-                    console.error("Error saving players", err);
-                    showError("Error guardando: " + err.message);
-                });
-            db.ref('matches').set(matches)
-                .catch(err => console.error("Error saving matches", err));
-        }
-
-        // Autenticación con contraseña
         function showLoginPrompt() {
             const password = prompt('Ingresa la contraseña del grupo para acceder:');
             if (password === GROUP_PASSWORD) {
                 isAuthenticated = true;
                 document.body.style.display = 'block';
-                loadData();
+                initGroup();
             } else if (password !== null) {
                 alert('Contraseña incorrecta');
                 showLoginPrompt();
             }
         }
 
-        // Ocultar contenido hasta autenticar
         window.addEventListener('DOMContentLoaded', () => {
             if (!isAuthenticated) {
                 document.body.style.display = 'none';
                 showLoginPrompt();
             } else {
-                loadData();
+                initGroup();
             }
         });
 
-        // Añadir nuevo jugador
-        function saveNewPlayer() {
+        // --- SUPABASE: CARGAR/CREAR GRUPO Y DATOS ---
+
+        async function initGroup() {
+            // 1) Buscar grupo por código
+            const { data: groups, error } = await sb
+                .from('groups')
+                .select('*')
+                .eq('code', GROUP_CODE)
+                .limit(1);
+
+            if (error) {
+                console.error('Error buscando grupo', error);
+                showError('Error buscando grupo: ' + error.message);
+                return;
+            }
+
+            if (!groups || groups.length === 0) {
+                // 2) Si no existe, crearlo
+                const { data: newGroup, error: insertError } = await sb
+                    .from('groups')
+                    .insert({ code: GROUP_CODE })
+                    .select()
+                    .single();
+
+                if (insertError) {
+                    console.error('Error creando grupo', insertError);
+                    showError('Error creando grupo: ' + insertError.message);
+                    return;
+                }
+                currentGroup = newGroup;
+            } else {
+                currentGroup = groups[0];
+            }
+
+            // 3) Cargar jugadores y partidos
+            await loadData();
+        }
+
+        async function loadData() {
+            if (!currentGroup) return;
+
+            // Jugadores
+            const { data: playersData, error: playersError } = await sb
+                .from('players')
+                .select('*')
+                .eq('group_id', currentGroup.id);
+
+            if (playersError) {
+                console.error('Error cargando jugadores', playersError);
+                showError('Error cargando jugadores: ' + playersError.message);
+            } else {
+                // adaptamos a estructura que usa tu UI
+                players = (playersData || []).map(p => ({
+                    id: p.id,
+                    name: p.name,
+                    played: p.matches_played,
+                    won: p.wins,
+                    lost: p.losses,
+                }));
+            }
+
+            // Partidos
+            const { data: matchesData, error: matchesError } = await sb
+                .from('matches')
+                .select('*')
+                .eq('group_id', currentGroup.id)
+                .order('date', { ascending: true });
+
+            if (matchesError) {
+                console.error('Error cargando partidos', matchesError);
+            } else {
+                matches = (matchesData || []).map(m => ({
+                    team1: m.team1_players,
+                    team2: m.team2_players,
+                    winner: m.winner_team === 1 ? 'team1' : 'team2',
+                    date: new Date(m.date).toLocaleDateString('es-ES')
+                }));
+            }
+
+            updateUI();
+        }
+
+        // Ya no usamos saveData global, sino operaciones puntuales
+
+        // --- AÑADIR NUEVO JUGADOR ---
+
+        async function saveNewPlayer() {
             const name = document.getElementById('newPlayerName').value.trim();
 
             if (!name) {
@@ -526,21 +570,45 @@
                 return;
             }
 
+            if (!currentGroup) {
+                showError('Grupo no cargado');
+                return;
+            }
+
+            const { data, error } = await sb
+                .from('players')
+                .insert({
+                    group_id: currentGroup.id,
+                    name: name,
+                    matches_played: 0,
+                    wins: 0,
+                    losses: 0
+                })
+                .select()
+                .single();
+
+            if (error) {
+                console.error('Error creando jugador', error);
+                showError('Error guardando jugador: ' + error.message);
+                return;
+            }
+
             players.push({
-                name: name,
+                id: data.id,
+                name: data.name,
                 played: 0,
                 won: 0,
                 lost: 0
             });
 
             document.getElementById('newPlayerName').value = '';
-            saveData();
             updateUI();
             showSuccess('Jugador añadido correctamente');
         }
 
-        // Registrar un partido
-        function registerMatch() {
+        // --- REGISTRAR PARTIDO ---
+
+        async function registerMatch() {
             const playerName = document.getElementById('playerName').value;
             const partner = document.getElementById('partner').value;
             const rival1 = document.getElementById('rival1').value;
@@ -557,26 +625,86 @@
                 return;
             }
 
-            if (playerName === rival1 || playerName === rival2 || partner === rival1 || partner === rival2 || rival1 === rival2) {
+            if (playerName === rival1 || playerName === rival2 ||
+                partner === rival1 || partner === rival2 ||
+                rival1 === rival2) {
                 showError('Los jugadores no pueden estar en dos equipos');
                 return;
             }
 
-            // Registrar el partido
+            if (!currentGroup) {
+                showError('Grupo no cargado');
+                return;
+            }
+
+            // 1) Insertar partido en Supabase
+            const team1Players = [playerName, partner];
+            const team2Players = [rival1, rival2];
+            const winnerTeamNumber = winner === 'team1' ? 1 : 2;
+
+            const { data: matchData, error: matchError } = await sb
+                .from('matches')
+                .insert({
+                    group_id: currentGroup.id,
+                    date: new Date().toISOString(),
+                    team1_players: team1Players,
+                    team2_players: team2Players,
+                    winner_team: winnerTeamNumber
+                })
+                .select()
+                .single();
+
+            if (matchError) {
+                console.error('Error registrando partido', matchError);
+                showError('Error registrando partido: ' + matchError.message);
+                return;
+            }
+
+            // 2) Actualizar estadísticas de jugadores en Supabase
+            const playersInMatch = [playerName, partner, rival1, rival2];
+
+            for (const name of playersInMatch) {
+                // buscar en Supabase
+                const { data: playerRows, error: playerError } = await sb
+                    .from('players')
+                    .select('*')
+                    .eq('group_id', currentGroup.id)
+                    .eq('name', name)
+                    .limit(1);
+
+                if (playerError || !playerRows || playerRows.length === 0) continue;
+
+                const p = playerRows[0];
+
+                const isWinner =
+                    (winner === 'team1' && (name === playerName || name === partner)) ||
+                    (winner === 'team2' && (name === rival1 || name === rival2));
+
+                const updated = {
+                    matches_played: p.matches_played + 1,
+                    wins: p.wins + (isWinner ? 1 : 0),
+                    losses: p.losses + (isWinner ? 0 : 1)
+                };
+
+                await sb
+                    .from('players')
+                    .update(updated)
+                    .eq('id', p.id);
+            }
+
+            // 3) Actualizar arrays locales y UI
             matches.push({
-                team1: [playerName, partner],
-                team2: [rival1, rival2],
+                team1: team1Players,
+                team2: team2Players,
                 winner: winner,
                 date: new Date().toLocaleDateString('es-ES')
             });
 
-            // Actualizar estadísticas
             const players_in_match = [playerName, partner, rival1, rival2];
             players_in_match.forEach(name => {
                 let player = players.find(p => p.name === name);
                 if (player) {
                     player.played++;
-
                     if (winner === 'team1' && (name === playerName || name === partner)) {
                         player.won++;
                     } else if (winner === 'team2' && (name === rival1 || name === rival2)) {
@@ -587,11 +715,9 @@
                 }
             });
 
-            saveData();
             updateUI();
             showSuccess('¡Partido registrado correctamente!');
 
-            // Limpiar formulario
             document.getElementById('playerName').value = '';
             document.getElementById('partner').value = '';
             document.getElementById('rival1').value = '';
@@ -599,7 +725,8 @@
             document.getElementById('winner').value = '';
         }
 
-        // Actualizar interfaz
+        // --- UI (igual que antes, casi sin cambios) ---
+
         function updateUI() {
             updateSelects();
             updateStatsTable();
@@ -607,7 +734,6 @@
             updatePlayersList();
         }
 
-        // Actualizar selectores
         function updateSelects() {
             const selects = ['playerName', 'partner', 'rival1', 'rival2'];
             const playerNames = players.map(p => p.name);
@@ -628,7 +754,6 @@
             });
         }
 
-        // Actualizar tabla de estadísticas
         function updateStatsTable() {
             const statsTable = document.getElementById('statsTable');
 
@@ -637,7 +762,6 @@
                 return;
             }
 
-            // Ordenar por porcentaje de victorias
             const sortedPlayers = [...players].sort((a, b) => {
                 const rateA = a.played > 0 ? (a.won / a.played) : 0;
                 const rateB = b.played > 0 ? (b.won / b.played) : 0;
@@ -652,23 +776,22 @@
                 else if (index === 2 && sortedPlayers.length > 2) medal = '🥉';
 
                 return `
-                    <tr${index === 0 ? ' class="rank-1"' : ''}>
-                        <td style="font-weight: 700; font-size: 1.2em;">${medal || (index + 1)}</td>
-                        <td><strong>${player.name}</strong></td>
-                        <td>${player.played}</td>
-                        <td style="color: #28a745; font-weight: 600;">${player.won}</td>
-                        <td style="color: #f5576c; font-weight: 600;">${player.lost}</td>
-                        <td><span class="percentage">${winRate}%</span></td>
-                    </tr>
-                `;
+        <tr${index === 0 ? ' class="rank-1"' : ''}>
+          <td style="font-weight: 700; font-size: 1.2em;">${medal || (index + 1)}</td>
+          <td><strong>${player.name}</strong></td>
+          <td>${player.played}</td>
+          <td style="color: #28a745; font-weight: 600;">${player.won}</td>
+          <td style="color: #f5576c; font-weight: 600;">${player.lost}</td>
+          <td><span class="percentage">${winRate}%</span></td>
+        </tr>
+      `;
             }).join('');
         }
 
-        // Actualizar resumen
         function updateSummary() {
             const totalMatches = matches.length;
             const activePlayer = players.length;
-            const topPlayer = players.length > 0 ? players.sort((a, b) => {
+            const topPlayer = players.length > 0 ? players.slice().sort((a, b) => {
                 const rateA = a.played > 0 ? (a.won / a.played) : 0;
                 const rateB = b.played > 0 ? (b.won / b.played) : 0;
                 return rateB - rateA;
@@ -687,7 +810,6 @@
             document.getElementById('avgWinRate').textContent = avgWinRate + '%';
         }
 
-        // Listar jugadores
         function updatePlayersList() {
             const list = document.getElementById('playersList');
 
@@ -696,25 +818,35 @@
                 return;
             }
 
-            list.innerHTML = players.map((player, index) => `
-                <div style="padding: 10px; border-bottom: 1px solid #e0e0e0; display: flex; justify-content: space-between; align-items: center;">
-                    <span><strong>${player.name}</strong></span>
-                    <button onclick="removePlayer('${player.name}')" style="background: #f5576c; color: white; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer; font-size: 0.8em;">Eliminar</button>
-                </div>
-            `).join('');
+            list.innerHTML = players.map((player) => `
+      <div style="padding: 10px; border-bottom: 1px solid #e0e0e0; display: flex; justify-content: space-between; align-items: center;">
+        <span><strong>${player.name}</strong></span>
+        <button onclick="removePlayer('${player.name}')" style="background: #f5576c; color: white; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer; font-size: 0.8em;">Eliminar</button>
+      </div>
+    `).join('');
         }
 
-        // Eliminar jugador
-        function removePlayer(name) {
+        async function removePlayer(name) {
+            if (!currentGroup) {
+                showError('Grupo no cargado');
+                return;
+            }
+
             if (confirm(`¿Eliminar a ${name}? Se perderán sus estadísticas.`)) {
+                // Borrar en Supabase
+                await sb
+                    .from('players')
+                    .delete()
+                    .eq('group_id', currentGroup.id)
+                    .eq('name', name);
+
+                // Borrar en memoria
                 players = players.filter(p => p.name !== name);
-                saveData();
                 updateUI();
                 showSuccess('Jugador eliminado');
             }
         }
 
-        // Mostrar mensaje
         function showSuccess(message) {
             const msg = document.getElementById('successMsg');
             msg.textContent = message;
@@ -729,18 +861,11 @@
             setTimeout(() => msg.style.display = 'none', 3000);
         }
 
-        // Añadir jugador rápido
         function addNewPlayer() {
             document.getElementById('newPlayerName').focus();
         }
-
-        // Inicializar cuando el DOM esté listo
-        document.addEventListener('DOMContentLoaded', () => {
-            if (isAuthenticated) {
-                loadData();
-            }
-        });
     </script>
+
 </body>
 
 </html>
