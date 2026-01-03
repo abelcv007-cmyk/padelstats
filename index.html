@@ -1,0 +1,730 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PadelStats - Gestor de Partidos de Pádel</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+            color: #333;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
+        }
+
+        header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2);
+        }
+
+        header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+
+        .content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            padding: 40px;
+        }
+
+        .section {
+            background: #f8f9fa;
+            padding: 25px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+        }
+
+        .section h2 {
+            color: #667eea;
+            font-size: 1.8em;
+            margin-bottom: 20px;
+            border-bottom: 3px solid #667eea;
+            padding-bottom: 15px;
+        }
+
+        .form-group {
+            margin-bottom: 18px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #555;
+            font-size: 0.95em;
+        }
+
+        input[type="text"],
+        select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 6px;
+            font-size: 1em;
+            transition: all 0.3s ease;
+            background: white;
+        }
+
+        input[type="text"]:focus,
+        select:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        select {
+            cursor: pointer;
+            appearance: none;
+            background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23667eea' stroke-width='2'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+            background-repeat: no-repeat;
+            background-position: right 12px center;
+            background-size: 20px;
+            padding-right: 40px;
+        }
+
+        .btn {
+            display: inline-block;
+            padding: 12px 28px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+            width: 100%;
+            margin-top: 10px;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        .btn-secondary {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            margin-top: 10px;
+        }
+
+        .table-wrapper {
+            overflow-x: auto;
+            grid-column: 1 / -1;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        thead {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        th {
+            padding: 15px;
+            text-align: left;
+            font-weight: 600;
+            font-size: 0.95em;
+        }
+
+        td {
+            padding: 15px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        tr:hover {
+            background: #f0f4ff;
+        }
+
+        .rank-1 {
+            background: #fff9e6 !important;
+        }
+
+        .stat-badge {
+            display: inline-block;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 0.85em;
+            font-weight: 600;
+        }
+
+        .badge-gold {
+            background: #ffd700;
+            color: #333;
+        }
+
+        .badge-silver {
+            background: #c0c0c0;
+            color: #333;
+        }
+
+        .badge-bronze {
+            background: #cd7f32;
+            color: white;
+        }
+
+        .percentage {
+            font-weight: 700;
+            color: #667eea;
+        }
+
+        .stats-summary {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 15px;
+            grid-column: 1 / -1;
+            margin-top: 20px;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+            border-left: 4px solid #667eea;
+        }
+
+        .stat-card h3 {
+            color: #999;
+            font-size: 0.85em;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .stat-card .value {
+            font-size: 2em;
+            font-weight: 700;
+            color: #667eea;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: #999;
+        }
+
+        .empty-state svg {
+            width: 60px;
+            height: 60px;
+            margin-bottom: 20px;
+            opacity: 0.3;
+        }
+
+        @media (max-width: 1024px) {
+            .content {
+                grid-template-columns: 1fr;
+            }
+
+            .stats-summary {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            header h1 {
+                font-size: 1.8em;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .stats-summary {
+                grid-template-columns: 1fr;
+            }
+
+            .section {
+                padding: 15px;
+            }
+
+            table {
+                font-size: 0.85em;
+            }
+
+            th, td {
+                padding: 10px;
+            }
+        }
+
+        .success-message {
+            background: #d4edda;
+            color: #155724;
+            padding: 15px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+            display: none;
+            border-left: 4px solid #28a745;
+        }
+
+        .error-message {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 15px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+            display: none;
+            border-left: 4px solid #f5576c;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🎾 PadelStats</h1>
+            <p>Gestor de resultados de partidos de pádel - Grupo de amigos</p>
+        </header>
+
+        <div class="content">
+            <!-- Sección de registro de partidos -->
+            <div class="section">
+                <h2>📝 Registrar Partido</h2>
+                <div id="successMsg" class="success-message">¡Partido registrado correctamente!</div>
+                <div id="errorMsg" class="error-message">Por favor, completa todos los campos.</div>
+
+                <div class="form-group">
+                    <label>Tu nombre:</label>
+                    <select id="playerName">
+                        <option value="">Selecciona jugador</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>Tu compañero:</label>
+                    <select id="partner">
+                        <option value="">Selecciona compañero</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>Rival 1:</label>
+                    <select id="rival1">
+                        <option value="">Selecciona rival</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>Rival 2:</label>
+                    <select id="rival2">
+                        <option value="">Selecciona rival</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>¿Quién ganó?</label>
+                    <select id="winner">
+                        <option value="">Selecciona ganador</option>
+                        <option value="team1">Tú y tu compañero</option>
+                        <option value="team2">Los rivales</option>
+                    </select>
+                </div>
+
+                <button class="btn" onclick="registerMatch()">Registrar Partido</button>
+                <button class="btn btn-secondary" onclick="addNewPlayer()">+ Añadir Jugador</button>
+            </div>
+
+            <!-- Sección de nuevo jugador -->
+            <div class="section">
+                <h2>➕ Nuevo Jugador</h2>
+                <p style="color: #666; margin-bottom: 20px; font-size: 0.95em;">Añade un nuevo jugador al grupo</p>
+
+                <div class="form-group">
+                    <label>Nombre del jugador:</label>
+                    <input type="text" id="newPlayerName" placeholder="Ej: Juan García">
+                </div>
+
+                <button class="btn" onclick="saveNewPlayer()">Guardar Jugador</button>
+
+                <h3 style="color: #667eea; margin-top: 30px; margin-bottom: 15px; font-size: 1.2em;">Jugadores actuales:</h3>
+                <div id="playersList" style="max-height: 200px; overflow-y: auto;">
+                    <div class="empty-state">
+                        <p>No hay jugadores registrados</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tabla de estadísticas -->
+            <div class="table-wrapper">
+                <h2 style="padding: 0 40px; margin-top: 30px; color: #667eea;">📊 Ranking de Jugadores</h2>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Jugador</th>
+                            <th>Partidos Jugados</th>
+                            <th>Victorias</th>
+                            <th>Derrotas</th>
+                            <th>% Victorias</th>
+                        </tr>
+                    </thead>
+                    <tbody id="statsTable">
+                        <tr>
+                            <td colspan="6" style="text-align: center; color: #999; padding: 40px;">
+                                Registra un partido para ver estadísticas
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Resumen de estadísticas -->
+            <div class="stats-summary">
+                <div class="stat-card">
+                    <h3>Total de Partidos</h3>
+                    <div class="value" id="totalMatches">0</div>
+                </div>
+                <div class="stat-card">
+                    <h3>Jugadores Activos</h3>
+                    <div class="value" id="activePlayer">0</div>
+                </div>
+                <div class="stat-card">
+                    <h3>Mejor Racha</h3>
+                    <div class="value" id="topPlayer" style="font-size: 1.2em;">—</div>
+                </div>
+                <div class="stat-card">
+                    <h3>Tasa de Victoria General</h3>
+                    <div class="value" id="avgWinRate">0%</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-database.js"></script>
+
+    <script>
+        // Configuración de Firebase (IMPORTANTE: obtén tus credenciales)
+        const firebaseConfig = {
+            apiKey: "AIzaSyA3VrTmPJsJwh6KZ6TW_1ScZ8eya-K8eZU",
+            authDomain: "padel-los-cachorros.firebaseapp.com",
+            projectId: "padel-los-cachorros",
+            storageBucket: "padel-los-cachorros.appspot.com",
+            messagingSenderId: "914321201812",
+            appId: "1:914321201812:web:a213e0667ad51a19c17281"
+};
+
+        // Inicializar Firebase
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
+
+        // Datos locales
+        let players = [];
+        let matches = [];
+        let isAuthenticated = false;
+        const GROUP_PASSWORD = "berromoro"; // Cambiar por contraseña del grupo
+
+        // Cargar datos desde Firebase al iniciar
+        function loadData() {
+            if (!isAuthenticated) {
+                showLoginPrompt();
+                return;
+            }
+
+            db.ref('players').on('value', (snapshot) => {
+                const data = snapshot.val();
+                players = data ? Object.values(data) : [];
+                updateUI();
+            });
+
+            db.ref('matches').on('value', (snapshot) => {
+                const data = snapshot.val();
+                matches = data ? Object.values(data) : [];
+                updateUI();
+            });
+        }
+
+        // Guardar datos en Firebase
+        function saveData() {
+            if (!isAuthenticated) return;
+
+            db.ref('players').set(players);
+            db.ref('matches').set(matches);
+        }
+
+        // Autenticación con contraseña
+        function showLoginPrompt() {
+            const password = prompt('Ingresa la contraseña del grupo para acceder:');
+            if (password === GROUP_PASSWORD) {
+                isAuthenticated = true;
+                document.body.style.display = 'block';
+                loadData();
+            } else if (password !== null) {
+                alert('Contraseña incorrecta');
+                showLoginPrompt();
+            }
+        }
+
+        // Ocultar contenido hasta autenticar
+        window.addEventListener('DOMContentLoaded', () => {
+            if (!isAuthenticated) {
+                document.body.style.display = 'none';
+                showLoginPrompt();
+            } else {
+                loadData();
+            }
+        });
+
+        // Añadir nuevo jugador
+        function saveNewPlayer() {
+            const name = document.getElementById('newPlayerName').value.trim();
+            
+            if (!name) {
+                showError('Por favor, ingresa un nombre');
+                return;
+            }
+
+            if (players.some(p => p.name.toLowerCase() === name.toLowerCase())) {
+                showError('Este jugador ya existe');
+                return;
+            }
+
+            players.push({
+                name: name,
+                played: 0,
+                won: 0,
+                lost: 0
+            });
+
+            document.getElementById('newPlayerName').value = '';
+            saveData();
+            updateUI();
+            showSuccess('Jugador añadido correctamente');
+        }
+
+        // Registrar un partido
+        function registerMatch() {
+            const playerName = document.getElementById('playerName').value;
+            const partner = document.getElementById('partner').value;
+            const rival1 = document.getElementById('rival1').value;
+            const rival2 = document.getElementById('rival2').value;
+            const winner = document.getElementById('winner').value;
+
+            if (!playerName || !partner || !rival1 || !rival2 || !winner) {
+                showError('Por favor, completa todos los campos');
+                return;
+            }
+
+            if (playerName === partner) {
+                showError('El compañero no puede ser el mismo jugador');
+                return;
+            }
+
+            if (playerName === rival1 || playerName === rival2 || partner === rival1 || partner === rival2 || rival1 === rival2) {
+                showError('Los jugadores no pueden estar en dos equipos');
+                return;
+            }
+
+            // Registrar el partido
+            matches.push({
+                team1: [playerName, partner],
+                team2: [rival1, rival2],
+                winner: winner,
+                date: new Date().toLocaleDateString('es-ES')
+            });
+
+            // Actualizar estadísticas
+            const players_in_match = [playerName, partner, rival1, rival2];
+            players_in_match.forEach(name => {
+                let player = players.find(p => p.name === name);
+                if (player) {
+                    player.played++;
+                    
+                    if (winner === 'team1' && (name === playerName || name === partner)) {
+                        player.won++;
+                    } else if (winner === 'team2' && (name === rival1 || name === rival2)) {
+                        player.won++;
+                    } else {
+                        player.lost++;
+                    }
+                }
+            });
+
+            saveData();
+            updateUI();
+            showSuccess('¡Partido registrado correctamente!');
+            
+            // Limpiar formulario
+            document.getElementById('playerName').value = '';
+            document.getElementById('partner').value = '';
+            document.getElementById('rival1').value = '';
+            document.getElementById('rival2').value = '';
+            document.getElementById('winner').value = '';
+        }
+
+        // Actualizar interfaz
+        function updateUI() {
+            updateSelects();
+            updateStatsTable();
+            updateSummary();
+            updatePlayersList();
+        }
+
+        // Actualizar selectores
+        function updateSelects() {
+            const selects = ['playerName', 'partner', 'rival1', 'rival2'];
+            const playerNames = players.map(p => p.name);
+
+            selects.forEach(id => {
+                const select = document.getElementById(id);
+                const current = select.value;
+                select.innerHTML = '<option value="">Selecciona jugador</option>';
+                
+                playerNames.forEach(name => {
+                    const option = document.createElement('option');
+                    option.value = name;
+                    option.textContent = name;
+                    select.appendChild(option);
+                });
+                
+                select.value = current;
+            });
+        }
+
+        // Actualizar tabla de estadísticas
+        function updateStatsTable() {
+            const statsTable = document.getElementById('statsTable');
+            
+            if (players.length === 0) {
+                statsTable.innerHTML = '<tr><td colspan="6" style="text-align: center; color: #999; padding: 40px;">Registra un partido para ver estadísticas</td></tr>';
+                return;
+            }
+
+            // Ordenar por porcentaje de victorias
+            const sortedPlayers = [...players].sort((a, b) => {
+                const rateA = a.played > 0 ? (a.won / a.played) : 0;
+                const rateB = b.played > 0 ? (b.won / b.played) : 0;
+                return rateB - rateA;
+            });
+
+            statsTable.innerHTML = sortedPlayers.map((player, index) => {
+                const winRate = player.played > 0 ? ((player.won / player.played) * 100).toFixed(1) : '0.0';
+                let medal = '';
+                if (index === 0 && sortedPlayers.length > 0) medal = '🥇';
+                else if (index === 1 && sortedPlayers.length > 1) medal = '🥈';
+                else if (index === 2 && sortedPlayers.length > 2) medal = '🥉';
+
+                return `
+                    <tr${index === 0 ? ' class="rank-1"' : ''}>
+                        <td style="font-weight: 700; font-size: 1.2em;">${medal || (index + 1)}</td>
+                        <td><strong>${player.name}</strong></td>
+                        <td>${player.played}</td>
+                        <td style="color: #28a745; font-weight: 600;">${player.won}</td>
+                        <td style="color: #f5576c; font-weight: 600;">${player.lost}</td>
+                        <td><span class="percentage">${winRate}%</span></td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        // Actualizar resumen
+        function updateSummary() {
+            const totalMatches = matches.length;
+            const activePlayer = players.length;
+            const topPlayer = players.length > 0 ? players.sort((a, b) => {
+                const rateA = a.played > 0 ? (a.won / a.played) : 0;
+                const rateB = b.played > 0 ? (b.won / b.played) : 0;
+                return rateB - rateA;
+            })[0].name : '—';
+
+            let avgWinRate = 0;
+            if (players.length > 0) {
+                const totalWins = players.reduce((sum, p) => sum + p.won, 0);
+                const totalPlayed = players.reduce((sum, p) => sum + p.played, 0);
+                avgWinRate = totalPlayed > 0 ? ((totalWins / totalPlayed) * 100).toFixed(1) : 0;
+            }
+
+            document.getElementById('totalMatches').textContent = totalMatches;
+            document.getElementById('activePlayer').textContent = activePlayer;
+            document.getElementById('topPlayer').textContent = topPlayer;
+            document.getElementById('avgWinRate').textContent = avgWinRate + '%';
+        }
+
+        // Listar jugadores
+        function updatePlayersList() {
+            const list = document.getElementById('playersList');
+            
+            if (players.length === 0) {
+                list.innerHTML = '<div class="empty-state"><p>No hay jugadores registrados</p></div>';
+                return;
+            }
+
+            list.innerHTML = players.map((player, index) => `
+                <div style="padding: 10px; border-bottom: 1px solid #e0e0e0; display: flex; justify-content: space-between; align-items: center;">
+                    <span><strong>${player.name}</strong></span>
+                    <button onclick="removePlayer('${player.name}')" style="background: #f5576c; color: white; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer; font-size: 0.8em;">Eliminar</button>
+                </div>
+            `).join('');
+        }
+
+        // Eliminar jugador
+        function removePlayer(name) {
+            if (confirm(`¿Eliminar a ${name}? Se perderán sus estadísticas.`)) {
+                players = players.filter(p => p.name !== name);
+                saveData();
+                updateUI();
+                showSuccess('Jugador eliminado');
+            }
+        }
+
+        // Mostrar mensaje
+        function showSuccess(message) {
+            const msg = document.getElementById('successMsg');
+            msg.textContent = message;
+            msg.style.display = 'block';
+            setTimeout(() => msg.style.display = 'none', 3000);
+        }
+
+        function showError(message) {
+            const msg = document.getElementById('errorMsg');
+            msg.textContent = message;
+            msg.style.display = 'block';
+            setTimeout(() => msg.style.display = 'none', 3000);
+        }
+
+        // Añadir jugador rápido
+        function addNewPlayer() {
+            document.getElementById('newPlayerName').focus();
+        }
+
+        // Inicializar cuando el DOM esté listo
+        document.addEventListener('DOMContentLoaded', () => {
+            if (isAuthenticated) {
+                loadData();
+            }
+        });
+    </script>
+</body>
+</html>
