@@ -34,6 +34,37 @@
             color: white;
             padding: 30px;
             text-align: center;
+            position: relative;
+            /* Para posicionar el status */
+        }
+
+        .connection-status {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            padding: 6px 12px;
+            border-radius: 20px;
+            background: rgba(255, 255, 255, 0.2);
+            backdrop-filter: blur(5px);
+            font-size: 0.85em;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #ffc107;
+            box-shadow: 0 0 5px rgba(255, 193, 7, 0.5);
+            transition: all 0.3s ease;
+        }
+
+        .status-dot.connected {
+            background: #00ff48;
+            box-shadow: 0 0 8px rgba(0, 255, 72, 0.6);
         }
 
         header h1 {
@@ -307,6 +338,10 @@
 <body>
     <div class="container">
         <header>
+            <div class="connection-status">
+                <div id="connectionDot" class="status-dot"></div>
+                <span id="connectionText">Conectando...</span>
+            </div>
             <h1>🎾 PadelStats</h1>
             <p>Gestor de resultados de partidos de pádel - Grupo de amigos</p>
         </header>
@@ -507,6 +542,58 @@
 
             // 3) Cargar jugadores y partidos
             await loadData();
+
+            // 4) Iniciar suscripción Realtime
+            setupRealtimeSubscription();
+        }
+
+        let realtimeChannel = null;
+
+        function setupRealtimeSubscription() {
+            if (!currentGroup || realtimeChannel) return;
+
+            realtimeChannel = sb.channel('group_updates')
+                .on(
+                    'postgres_changes',
+                    {
+                        event: '*',
+                        schema: 'public',
+                        table: 'players',
+                        filter: `group_id=eq.${currentGroup.id}`
+                    },
+                    (payload) => {
+                        console.log('Cambio en jugadores detectado', payload);
+                        loadData();
+                    }
+                )
+                .on(
+                    'postgres_changes',
+                    {
+                        event: '*',
+                        schema: 'public',
+                        table: 'matches',
+                        filter: `group_id=eq.${currentGroup.id}`
+                    },
+                    (payload) => {
+                        console.log('Cambio en partidos detectado', payload);
+                        loadData();
+                    }
+                )
+                .subscribe((status) => {
+                    const dot = document.getElementById('connectionDot');
+                    const text = document.getElementById('connectionText');
+
+                    if (status === 'SUBSCRIBED') {
+                        dot.classList.add('connected');
+                        text.textContent = 'En vivo';
+                    } else if (status === 'CLOSED') {
+                        dot.classList.remove('connected');
+                        text.textContent = 'Desconectado';
+                    } else if (status === 'CHANNEL_ERROR') {
+                        dot.classList.remove('connected');
+                        text.textContent = 'Error Conexión';
+                    }
+                });
         }
 
         async function loadData() {
