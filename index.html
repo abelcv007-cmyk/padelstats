@@ -416,7 +416,17 @@
 
             <!-- Tabla de estadísticas -->
             <div class="table-wrapper">
-                <h2 style="padding: 0 40px; margin-top: 30px; color: #334155;">📊 Ranking de Jugadores</h2>
+                <div
+                    style="display: flex; justify-content: space-between; align-items: center; padding: 0 40px; margin-top: 30px;">
+                    <h2 style="margin: 0; color: #334155; border: none; padding: 0;">📊 Ranking de Jugadores</h2>
+                    <select id="sortRanking" onchange="updateStatsTable()"
+                        style="width: auto; padding: 8px 12px; font-size: 0.9em;">
+                        <option value="wins" selected>Victorias</option>
+                        <option value="winRate">% Victorias</option>
+                        <option value="matches">Partidos Jugados</option>
+                        <option value="losses">Derrotas</option>
+                    </select>
+                </div>
                 <table>
                     <thead>
                         <tr>
@@ -826,10 +836,21 @@
                 return;
             }
 
+            const sortType = document.getElementById('sortRanking').value;
+
             const sortedPlayers = [...players].sort((a, b) => {
-                const rateA = a.played > 0 ? (a.won / a.played) : 0;
-                const rateB = b.played > 0 ? (b.won / b.played) : 0;
-                return rateB - rateA;
+                if (sortType === 'winRate') {
+                    const rateA = a.played > 0 ? (a.won / a.played) : 0;
+                    const rateB = b.played > 0 ? (b.won / b.played) : 0;
+                    return rateB - rateA;
+                } else if (sortType === 'wins') {
+                    return b.won - a.won;
+                } else if (sortType === 'matches') {
+                    return b.played - a.played;
+                } else if (sortType === 'losses') {
+                    return b.lost - a.lost;
+                }
+                return 0;
             });
 
             statsTable.innerHTML = sortedPlayers.map((player, index) => {
@@ -855,11 +876,44 @@
         function updateSummary() {
             const totalMatches = matches.length;
             const activePlayer = players.length;
-            const topPlayer = players.length > 0 ? players.slice().sort((a, b) => {
-                const rateA = a.played > 0 ? (a.won / a.played) : 0;
-                const rateB = b.played > 0 ? (b.won / b.played) : 0;
-                return rateB - rateA;
-            })[0].name : '—';
+            // Calcular la mejor racha actual (victorias consecutivas activas)
+            const playerStreaks = {};
+            // Inicializar a 0
+            players.forEach(p => playerStreaks[p.name] = 0);
+
+            matches.forEach(m => {
+                const winners = m.winner === 'team1' ? m.team1 : m.team2;
+                const losers = m.winner === 'team1' ? m.team2 : m.team1;
+
+                if (winners && losers) {
+                    winners.forEach(w => {
+                        playerStreaks[w] = (playerStreaks[w] || 0) + 1;
+                    });
+                    losers.forEach(l => {
+                        playerStreaks[l] = 0;
+                    });
+                }
+            });
+
+            // Encontrar el máximo
+            let maxStreak = -1;
+            let bestPlayers = [];
+
+            for (const [name, streak] of Object.entries(playerStreaks)) {
+                if (streak > maxStreak) {
+                    maxStreak = streak;
+                    bestPlayers = [name];
+                } else if (streak === maxStreak) {
+                    bestPlayers.push(name);
+                }
+            }
+
+            let topPlayerDisplay = '—';
+            if (maxStreak > 0) {
+                topPlayerDisplay = `${bestPlayers.join(', ')} (${maxStreak})`;
+            } else if (maxStreak === 0) {
+                topPlayerDisplay = '0';
+            }
 
             let avgWinRate = 0;
             if (players.length > 0) {
@@ -870,7 +924,15 @@
 
             document.getElementById('totalMatches').textContent = totalMatches;
             document.getElementById('activePlayer').textContent = activePlayer;
-            document.getElementById('topPlayer').textContent = topPlayer;
+            document.getElementById('topPlayer').textContent = topPlayerDisplay;
+
+            // Ajustar tamaño de fuente si hay muchos nombres
+            const topPlayerEl = document.getElementById('topPlayer');
+            if (bestPlayers.length > 2) {
+                topPlayerEl.style.fontSize = '0.9em';
+            } else {
+                topPlayerEl.style.fontSize = '1.2em';
+            }
             document.getElementById('avgWinRate').textContent = avgWinRate + '%';
         }
 
